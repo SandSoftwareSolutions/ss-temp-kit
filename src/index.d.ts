@@ -2,7 +2,7 @@ export interface TempDir {
   readonly path: string;
   join(...parts: string[]): string;
   write(name: string, content?: string | Uint8Array): Promise<string>;
-  read(name: string): Promise<string>;
+  read(name: string, encoding?: BufferEncoding): Promise<string>;
   read(name: string, encoding: null): Promise<Buffer>;
   remove(): Promise<void>;
   [Symbol.asyncDispose](): Promise<void>;
