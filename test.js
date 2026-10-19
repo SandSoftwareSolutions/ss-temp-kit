@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname } from "node:path";
 import { test } from "node:test";
@@ -74,4 +74,56 @@ test("pending counts folders not yet removed", async () => {
   assert.equal(pending(), before);
   const sync = createTempDirSync();
   assert.ok(existsSync(sync));
+});
+
+test("a file name that merely starts with two dots is fine", async () => {
+  await withTempDir(async (dir) => {
+    await dir.write("..hidden", "1");
+    await dir.write("a/..b/c", "2");
+    assert.equal(await dir.read("..hidden"), "1");
+    assert.equal(await dir.read("a/..b/c"), "2");
+    assert.throws(() => dir.join(".."), RangeError);
+    assert.throws(() => dir.join("a", "..", "..", "x"), RangeError);
+  });
+});
+
+test("folders are removed when the process is ended by Ctrl-C, kill or a closing terminal", { skip: process.platform === "win32" }, () => {
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    const code = `
+      import { createTempDir } from ${JSON.stringify(new URL("./src/index.js", import.meta.url).href)};
+      const dir = await createTempDir({ prefix: "signal-test-" });
+      await dir.write("x", "1");
+      console.log(dir.path);
+      process.kill(process.pid, ${JSON.stringify(signal)});
+      setTimeout(() => {}, 5000);`;
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", code], { encoding: "utf8" });
+    assert.equal(result.signal, signal, "the process still ends by the signal");
+    assert.equal(existsSync(result.stdout.trim()), false, `${signal} left the folder behind`);
+  }
+});
+
+test("a program with its own signal handler keeps control", { skip: process.platform === "win32" }, () => {
+  const code = `
+    import { createTempDir } from ${JSON.stringify(new URL("./src/index.js", import.meta.url).href)};
+    const dir = await createTempDir({ prefix: "signal-own-" });
+    process.on("SIGTERM", () => { console.log("mine " + dir.path); process.exit(0); });
+    process.kill(process.pid, "SIGTERM");
+    setTimeout(() => {}, 5000);`;
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", code], { encoding: "utf8" });
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /^mine /);
+  assert.equal(existsSync(result.stdout.trim().slice(5)), false, "still removed by the exit hook");
+});
+
+test("a failed removal can be tried again and is not forgotten", { skip: process.platform === "win32" || process.getuid?.() === 0 }, async () => {
+  const dir = await createTempDir();
+  await dir.write("locked/file", "1");
+  chmodSync(dir.join("locked"), 0o500);
+  const before = pending();
+  await assert.rejects(dir.remove());
+  assert.equal(pending(), before, "still counted as pending");
+  chmodSync(dir.join("locked"), 0o700);
+  await dir.remove();
+  assert.equal(existsSync(dir.path), false);
+  assert.equal(pending(), before - 1);
 });
