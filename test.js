@@ -45,9 +45,9 @@ test("names cannot leave the folder", async () => {
 });
 
 test("await using removes the folder at the end of the block", async () => {
-  const run = new Function("createTempDir", "return (async () => { let path; { await using dir = await createTempDir(); path = dir.path; await dir.write('x', '1'); } return path; })()");
   let path;
   try {
+    const run = new Function("createTempDir", "return (async () => { let path; { await using dir = await createTempDir(); path = dir.path; await dir.write('x', '1'); } return path; })()");
     path = await run(createTempDir);
   } catch (error) {
     if (error instanceof SyntaxError) return; // this Node version has no `await using`

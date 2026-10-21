@@ -1,6 +1,6 @@
 {
   "name": "@sandsoftwaresolutions/temp-kit",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Temporary folders and files that clean up after themselves, also on failure and at exit. Names cannot escape the folder.",
   "type": "module",
   "main": "./dist/index.cjs",
