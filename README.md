@@ -10,6 +10,8 @@ Temporary folders and files for tests and scripts that clean up after themselves
 npm install @sandsoftwaresolutions/temp-kit
 ```
 
+Works with `import` and `require()`, and ships TypeScript types for both.
+
 ## Usage
 
 ```js
